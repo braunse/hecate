@@ -1,0 +1,39 @@
+#! /usr/bin/env bash
+set -ex
+
+mydir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+function croak() {
+  echo "$*" >&2
+  exit 1
+}
+
+subcommand="$1"
+shift
+
+case "$subcommand" in
+  jitpack)
+    exec "$0" mill -j 0 __.publishM2Local
+    ;;
+
+  mill)
+    exec "$0" coursier launch --scala 2.13.10 mill -- "$@"
+    ;;
+
+  coursier)
+    if type coursier >/dev/null 2>&1; then
+      CS=coursier
+    else
+      CS="$mydir/cs"
+      if [ ! -x "$CS" ]; then
+        curl -o "$CS" -qL https://github.com/coursier/launchers/raw/master/coursier
+        chmod +x "$CS"
+      fi
+    fi
+    exec "$CS" "$@"
+    ;;
+
+  *)
+    croak "Unknown subcommand $subcommand"
+    ;;
+esac
