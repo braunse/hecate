@@ -2,40 +2,58 @@ import mill._
 import mill.scalalib._
 import mill.scalalib.publish._
 import mill.scalajslib._
+import $repo.`https://jitpack.io`
+import $ivy.`de.sebbraun::mill-utils:main-SNAPSHOT`
+import de.sebbraun.millutils._
 
 object v {
   val scala = "3.2.1"
   val scalaJS = "1.12.0"
   val circe = "0.14.3"
   val utest = "0.8.1"
+  object endpoints4s {
+    val algebra = "1.9.0"
+  }
+}
+
+object d {
+  val circe = DepGroup("io.circe", v.circe, "circe-")
+  val utest = DepGroup("com.lihaoyi", v.utest, "utest-")
+  object endpoints4s {
+    val algebra = DepGroup("org.endpoints4s", v.endpoints4s.algebra, "algebra-")
+  }
 }
 
 object meta extends Module {
   def optString(s: String): Option[String] =
-    if(s == null) None
+    if (s == null) None
     else {
       val st = s.trim()
-      if(st.isEmpty()) None
+      if (st.isEmpty()) None
       else Some(st)
     }
 
   def versionFromEnv = T.input { T.env.get("PUBLISH_VERSION") }
-  def versionFromGitSha = T.input { optString(os.proc("git", "rev-parse", "--short", "HEAD").call().out.trim) }
-  def versionFromGitTag = T.input { optString(os.proc("git", "tag", "-l", "-n0", "--points-at", "HEAD").call().out.trim.stripPrefix("v")) }
-  def publishVersion = T { (versionFromEnv() orElse versionFromGitTag() orElse versionFromGitSha()).getOrElse("latest") }
-
-  val groupID = "de.sebbraun.hecate"
-  val prefix = "hecate-"
+  def versionFromGitSha = T.input {
+    optString(os.proc("git", "rev-parse", "--short", "HEAD").call().out.trim)
 }
-
-trait CommonModule extends ScalaModule with PublishModule {
-  def scalaVersion = v.scala
-
-  def publishVersion = meta.publishVersion()
+  def versionFromGitTag = T.input {
+    optString(
+      os.proc("git", "tag", "-l", "-n0", "--points-at", "HEAD")
+        .call()
+        .out
+        .trim
+        .stripPrefix("v")
+    )
+  }
+  def publishVersion = T {
+    (versionFromEnv() orElse versionFromGitTag() orElse versionFromGitSha())
+      .getOrElse("latest")
+  }
 
   def pomSettings = PomSettings(
       description = "Auto-generation of Circe codecs",
-      organization = "de.sebbraun.hecate",
+    organization = groupID,
       url = "https://github.com/braunse/hecate",
       licenses = Seq(License.`MPL-2.0`),
       versionControl = VersionControl.github("braunse", "hecate"),
@@ -47,33 +65,42 @@ trait CommonModule extends ScalaModule with PublishModule {
         )
       )
   )
+
+  val groupID = "de.sebbraun.hecate"
+  val prefix = "hecate"
 }
 
-object jvm extends ScalaModule with CommonModule {
-  def millSourcePath = build.millSourcePath
+trait CommonSharedModule extends SharedPublishModule {
+  def scalaVersion = v.scala
+  def scalaJSVersion = v.scalaJS
 
-  def artifactName = "hecate-core"
+  def testFramework = "utest.runner.Framework"
 
+  def artifactNameSuffix: String
+  def artifactName = s"${meta.prefix}-${artifactNameSuffix}"
+  def publishVersion = meta.publishVersion()
+  def pomSettings = meta.pomSettings
+
+}
+
+object core extends CommonSharedModule {
   def ivyDeps = Agg(
-    ivy"io.circe::circe-core:${v.circe}"
+    d.circe.multi("core")
+  )
+  def testIvyDeps = Agg[MultiDep](
+    d.utest.self
   )
 
-  def sources = T.sources(
-    millSourcePath / "src" / "shared",
-    millSourcePath / "src" / "jvm"
-  )
+  def artifactNameSuffix = "core"
 
-  object tests extends Tests {
-    def ivyDeps = Agg(
-      ivy"com.lihaoyi::utest:${v.utest}"
-    )
+  object backend extends BackendModule with BackendPublishModule {
+    def moduleDeps = Seq()
+    object tests extends BackendTests
+  }
 
-    def testFramework = "utest.runner.Framework"
-
-    def sources = T.sources(
-      millSourcePath / "src" / "shared",
-      millSourcePath / "src" / "jvm"
-    )
+  object frontend extends FrontendModule with FrontendPublishModule {
+    def moduleDeps = Seq()
+    object tests extends FrontendTests
   }
 }
 
