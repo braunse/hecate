@@ -36,7 +36,7 @@ object meta extends Module {
   def versionFromEnv = T.input { T.env.get("PUBLISH_VERSION") }
   def versionFromGitSha = T.input {
     optString(os.proc("git", "rev-parse", "--short", "HEAD").call().out.trim)
-}
+  }
   def versionFromGitTag = T.input {
     optString(
       os.proc("git", "tag", "-l", "-n0", "--points-at", "HEAD")
@@ -52,18 +52,18 @@ object meta extends Module {
   }
 
   def pomSettings = PomSettings(
-      description = "Auto-generation of Circe codecs",
+    description = "Auto-generation of Circe codecs",
     organization = groupID,
-      url = "https://github.com/braunse/hecate",
-      licenses = Seq(License.`MPL-2.0`),
-      versionControl = VersionControl.github("braunse", "hecate"),
-      developers = Seq(
-        Developer(
-          id = "braunse",
-          name = "Sebastien Braun",
-          url = "https://github.com/braunse"
-        )
+    url = "https://github.com/braunse/hecate",
+    licenses = Seq(License.`MPL-2.0`),
+    versionControl = VersionControl.github("braunse", "hecate"),
+    developers = Seq(
+      Developer(
+        id = "braunse",
+        name = "Sebastien Braun",
+        url = "https://github.com/braunse"
       )
+    )
   )
 
   val groupID = "de.sebbraun.hecate"
@@ -84,9 +84,6 @@ trait CommonSharedModule extends SharedPublishModule {
 }
 
 object core extends CommonSharedModule {
-  def ivyDeps = Agg(
-    d.circe.multi("core")
-  )
   def testIvyDeps = Agg[MultiDep](
     d.utest.self
   )
@@ -94,42 +91,28 @@ object core extends CommonSharedModule {
   def artifactNameSuffix = "core"
 
   object backend extends BackendModule with BackendPublishModule {
-    def moduleDeps = Seq()
     object tests extends BackendTests
   }
 
   object frontend extends FrontendModule with FrontendPublishModule {
-    def moduleDeps = Seq()
     object tests extends FrontendTests
   }
 }
 
-object js extends ScalaJSModule with CommonModule {
-  def millSourcePath = build.millSourcePath
-
-  def scalaJSVersion = v.scalaJS
-
-  def artifactName = "hecate-core"
-
+object circe extends CommonSharedModule {
+  def artifactNameSuffix = "circe"
+  def moduleDeps = Seq(core)
   def ivyDeps = Agg(
-    ivy"io.circe::circe-core::${v.circe}"
+    d.circe.multi("core")
+  )
+  def testIvyDeps = Agg[MultiDep](
+    d.utest.self
   )
 
-  def sources = T.sources(
-    millSourcePath / "src" / "shared",
-    millSourcePath / "src" / "js"
-  )
-
-  object tests extends Tests {
-    def ivyDeps = Agg(
-      ivy"com.lihaoyi::utest::${v.utest}"
-    )
-
-    def testFramework = "utest.runner.Framework"
-
-    def sources = T.sources(
-      millSourcePath / "src" / "shared",
-      millSourcePath / "src" / "js"
-    )
+  object backend extends BackendModule with BackendPublishModule {
+    object tests extends BackendTests
+  }
+  object frontend extends FrontendModule with FrontendPublishModule {
+    object tests extends FrontendTests
   }
 }
